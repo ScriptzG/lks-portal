@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+server/storage/
+server/prisma/dev.db
+server/prisma/migrations_sqlite_backup/
+lks-systems-site/
+*.log
+.DS_Store
+.vscode/
+coverage/

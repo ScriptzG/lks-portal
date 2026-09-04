@@ -1,0 +1,344 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Now pointed at a real Supabase Postgres project (see DATABASE_URL in .env) — was SQLite for
+// local zero-install dev; every model was written to be portable, so this was a one-line change.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- String-literal "enums" ----------
+// These were plain Strings from day one (written for SQLite, which has no native enum type) and
+// stayed that way after the move to Postgres — converting to real Postgres enums is possible
+// later but isn't required, and every route already validates against these values at the
+// application boundary (server/src/lib/types.ts), mirrored here for reference:
+//   Role:               admin | client
+//   CompanyStatus:      active | inactive | prospect
+//   WebsiteStatus:      live | draft | pending_review
+//   DeploymentStatus:   pending | building | live | failed | rolled_back
+//   DeploymentTrigger:  admin_publish | client_publish | rollback
+//   SubscriptionStatus: trialing | active | past_due | cancelled
+//   FieldType:          text | textarea | image | color | link
+//   NotificationType:   invite_sent | publish_requested | deploy_succeeded | deploy_failed
+//                       | payment_overdue | support_request | message_received | general
+//   SenderRole (Message.senderRole): admin | client
+//   UploaderRole (Document.uploaderRole): admin | client
+//   TicketPriority: normal | urgent
+//   TicketStatus: open | answered | closed
+//   TicketReply.senderRole: admin | client
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  role           String
+  companyId      String?
+  company        Company?  @relation(fields: [companyId], references: [id])
+  suspended      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  lastLoginAt    DateTime?
+  tutorialSeenAt DateTime?
+
+  triggeredDeployments Deployment[]   @relation("DeploymentTriggeredBy")
+  notifications        Notification[]
+  sentInvites          Invite[]       @relation("InvitedBy")
+  sentMessages         Message[]      @relation("MessageSender")
+  uploadedDocuments    Document[]
+  createdTickets       Ticket[]       @relation("TicketCreator")
+  ticketReplies        TicketReply[]
+
+  @@map("users")
+}
+
+model Invite {
+  id          String    @id @default(uuid())
+  email       String
+  role        String    @default("client")
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id])
+  token       String    @unique
+  invitedById String?
+  invitedBy   User?     @relation("InvitedBy", fields: [invitedById], references: [id])
+  acceptedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@map("invites")
+}
+
+model Company {
+  id               String   @id @default(uuid())
+  name             String
+  logoUrl          String?
+  industry         String?
+  domain           String?
+  status           String   @default("prospect")
+  planId           String?
+  plan             Plan?    @relation(fields: [planId], references: [id])
+  stripeCustomerId String?
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  users         User[]
+  contacts      Contact[]
+  websites      Website[]
+  subscriptions Subscription[]
+  invites       Invite[]
+  messages      Message[]
+  documents     Document[]
+  tickets       Ticket[]
+
+  @@map("companies")
+}
+
+model Contact {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  jobTitle    String?
+  isPrimary   Boolean   @default(false)
+  notes       String?
+  lastLoginAt DateTime?
+  lastEditAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("contacts")
+}
+
+// editLocked blocks a CLIENT's own edits/publish entirely (see editableFields.ts, deployments.ts).
+// filesLocked is unrelated: it hides raw HTML/CSS/JS from the Files (Monaco) tab from EVERYONE,
+// admins included, while leaving the click-to-edit visual editor fully working either way — a
+// guardrail against an accidental raw-markup edit breaking a site, not an access-control gate.
+model Website {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name             String
+  domainUrl        String?
+  netlifySiteId    String?
+  status           String    @default("draft")
+  editLocked       Boolean   @default(false)
+  filesLocked      Boolean   @default(false)
+  allowSelfPublish Boolean   @default(false)
+  lastDeployedAt   DateTime?
+  createdAt        DateTime  @default(now())
+
+  files          WebsiteFile[]
+  editableFields EditableField[]
+  deployments    Deployment[]
+
+  @@map("websites")
+}
+
+model WebsiteFile {
+  id         String   @id @default(uuid())
+  websiteId  String
+  website    Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  filePath   String
+  storageUrl String
+  mimeType   String?
+  sizeBytes  Int?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([websiteId, filePath])
+  @@map("website_files")
+}
+
+model EditableField {
+  id           String   @id @default(uuid())
+  websiteId    String
+  website      Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  fieldKey     String
+  fieldType    String   @default("text")
+  label        String
+  section      String   @default("General")
+  sourceFile   String
+  currentValue String?
+  draftValue   String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([websiteId, fieldKey])
+  @@map("editable_fields")
+}
+
+model Deployment {
+  id              String    @id @default(uuid())
+  websiteId       String
+  website         Website   @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  triggeredById   String?
+  triggeredBy     User?     @relation("DeploymentTriggeredBy", fields: [triggeredById], references: [id])
+  trigger         String    @default("admin_publish")
+  status          String    @default("pending")
+  deployUrl       String?
+  versionSnapshot String
+  note            String?
+  createdAt       DateTime  @default(now())
+  deployedAt      DateTime?
+
+  @@map("deployments")
+}
+
+model Plan {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  priceMonthly   Float
+  maxSites       Int
+  canSelfPublish Boolean  @default(false)
+  featuresJson   String   @default("[]")
+  createdAt      DateTime @default(now())
+
+  companies     Company[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String    @id @default(uuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 Plan      @relation(fields: [planId], references: [id])
+  stripeSubscriptionId String?
+  status               String    @default("trialing")
+  startDate            DateTime  @default(now())
+  nextBillingDate      DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@map("subscriptions")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// A single conversation thread per company between the LKS Systems team and that company's
+// client user(s) — not per individual user, since a company may have more than one client login.
+// Only an admin may send the FIRST message in a thread (enforced in the route, not the schema);
+// once a thread exists, the client side may reply within it.
+model Message {
+  id         String   @id @default(uuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  senderRole String
+  body       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("messages")
+}
+
+// A shared file space per company — a Teams-style drop point for contracts, briefs, invoices,
+// brand assets, etc. Deliberately separate from a Website's own files (which are the site's
+// source code/assets); Documents are general-purpose files exchanged between LKS and the client.
+// Unlike Messages, either side may upload without the other going first — there's no ordering
+// restriction here, just per-company access control (see server/src/routes/documents.ts).
+model Document {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploaderRole String
+  fileName     String
+  storageUrl   String
+  mimeType     String?
+  sizeBytes    Int?
+  createdAt    DateTime @default(now())
+
+  @@map("documents")
+}
+
+// A formal support request, distinct from Message (one ongoing chat thread per company) and the
+// dashboard's quick "Request support" ping (a single fire-and-forget notification with no
+// tracking) — a Ticket has its own subject/priority/status and its own reply thread, matching the
+// ticket-support system already live on the LKS Systems marketing site (Supabase-backed, separate
+// project) that this feature is a from-scratch reimplementation of on this app's own stack, so the
+// same client-facing workflow (submit → staff replies → client can reopen it) works here too.
+model Ticket {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation("TicketCreator", fields: [createdById], references: [id])
+  subject     String
+  message     String
+  priority    String   @default("normal")
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  replies TicketReply[]
+
+  @@map("tickets")
+}
+
+model TicketReply {
+  id         String   @id @default(uuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation(fields: [senderId], references: [id])
+  senderRole String
+  message    String
+  createdAt  DateTime @default(now())
+
+  @@map("ticket_replies")
+}
+
+// A curated set of links LKS wants to surface — partner tools, training, downloads, resources.
+// Global (not per-company): the same list an admin curates is what every client portal shows,
+// filtered to the ones marked visible. Kept deliberately simple (a link, not a whole sub-app) —
+// exactly what was asked for tonight; a richer "Extras marketplace" is a real idea for later,
+// not something to half-build under time pressure.
+model Extra {
+  id               String   @id @default(uuid())
+  title            String
+  url              String
+  description      String?
+  icon             String?
+  visibleToClients Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("extras")
+}
+
+model SentEmail {
+  id        String   @id @default(uuid())
+  to        String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@map("sent_emails")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lks_portal_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lks
+      POSTGRES_PASSWORD: lks_dev_password
+      POSTGRES_DB: lks_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - lks_portal_pgdata:/var/lib/postgresql/data
+
+volumes:
+  lks_portal_pgdata:
