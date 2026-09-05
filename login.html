@@ -1,0 +1,130 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Login — LKS Systems</title>
+<meta name="description" content="Log in to the LKS Systems client portal to submit and track support tickets.">
+<meta name="theme-color" content="#050506">
+<meta name="robots" content="noindex">
+
+<link rel="icon" href="lks.png" type="image/png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="field" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<section class="auth-screen" style="--hero-photo:url('images/southend-hero.jpg');" data-lks-editable="auto-login-bg-1" data-lks-type="background" data-lks-bg-prop="--hero-photo" data-lks-label="Background image" data-lks-section="General">
+  <div class="auth-box">
+
+    <a href="index.html" class="auth-brand">
+      <span><img src="lks.png" alt="LKS Systems" data-lks-editable="auto-login-img-1" data-lks-type="image" data-lks-label="LKS Systems image" data-lks-section="General"></span>
+    </a>
+
+    <div class="form-panel">
+      <p class="eyebrow" style="margin-bottom:8px;" data-lks-editable="auto-login-p-1" data-lks-type="text" data-lks-label="Client login" data-lks-section="General">Client login</p>
+      <h1 style="font-size:1.5rem; margin-bottom:24px;" data-lks-editable="auto-login-h1-1" data-lks-type="text" data-lks-label="Welcome back." data-lks-section="General">Welcome back.</h1>
+
+      <div id="configWarning" class="form-alert is-warning" style="display:none;">
+        The client portal isn't fully set up yet — check back soon, or
+        <a href="contact.html" class="text-link" data-lks-editable="auto-login-a-1" data-lks-type="text" data-lks-label="get in touch" data-lks-section="ConfigWarning">get in touch</a> directly.
+      </div>
+
+      <form id="loginForm">
+        <div class="form-field">
+          <label for="login-email" data-lks-editable="auto-login-label-1" data-lks-type="text" data-lks-label="Email" data-lks-section="LoginForm">Email</label>
+          <input type="email" id="login-email" name="email" required="" autocomplete="username">
+        </div>
+        <div class="form-field">
+          <label for="login-password" data-lks-editable="auto-login-label-2" data-lks-type="text" data-lks-label="Password" data-lks-section="LoginForm">Password</label>
+          <input type="password" id="login-password" name="password" required="" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginSubmit" style="width:100%; justify-content:center;" data-lks-editable="auto-login-button-1" data-lks-type="text" data-lks-label="Log in" data-lks-section="LoginForm">
+          Log in
+        </button>
+        <div id="loginError" class="form-alert is-error"></div>
+      </form>
+
+      <p class="form-note">Don't have login details yet? <a href="contact.html" class="text-link" data-lks-editable="auto-login-a-2" data-lks-type="text" data-lks-label="Get in touch" data-lks-section="General">Get in touch</a> to get set up.</p>
+    </div>
+
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var configWarning = document.getElementById("configWarning");
+  var loginForm = document.getElementById("loginForm");
+  var loginError = document.getElementById("loginError");
+  var loginSubmit = document.getElementById("loginSubmit");
+
+  if (!supabaseConfigured) {
+    configWarning.style.display = "block";
+    loginSubmit.disabled = true;
+    return;
+  }
+
+  function showError(message) {
+    loginError.textContent = message;
+    loginError.classList.add("is-visible");
+  }
+
+  function goToRoleHome(userId) {
+    supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single()
+      .then(function (result) {
+        var isStaff = result.data && result.data.role === "staff";
+        window.location.href = isStaff ? "/dashboard" : "/portal";
+      });
+  }
+
+  /* already logged in? skip straight to the right dashboard */
+  supabaseClient.auth.getSession().then(function (result) {
+    var session = result.data && result.data.session;
+    if (session) goToRoleHome(session.user.id);
+  });
+
+  loginForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    loginError.classList.remove("is-visible");
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = "Logging in…";
+
+    var email = document.getElementById("login-email").value.trim();
+    var password = document.getElementById("login-password").value;
+
+    supabaseClient.auth
+      .signInWithPassword({ email: email, password: password })
+      .then(function (result) {
+        if (result.error) {
+          showError(result.error.message || "Couldn't log in — check your details and try again.");
+          loginSubmit.disabled = false;
+          loginSubmit.textContent = "Log in";
+          return;
+        }
+        goToRoleHome(result.data.user.id);
+      })
+      .catch(function () {
+        showError("Something went wrong — please try again.");
+        loginSubmit.disabled = false;
+        loginSubmit.textContent = "Log in";
+      });
+  });
+})();
+</script>
+
+
+</body></html>

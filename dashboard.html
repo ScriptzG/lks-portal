@@ -1,0 +1,586 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support Dashboard — LKS Systems</title>
+<meta name="description" content="LKS Systems support dashboard — manage client tickets and documents.">
+<meta name="theme-color" content="#050506">
+<meta name="robots" content="noindex">
+
+<link rel="icon" href="lks.png" type="image/png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="field" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="portal-topbar">
+  <a href="index.html" class="nav-brand">
+    <img src="lks.png" alt="LKS Systems" data-lks-editable="auto-dashboard-img-1" data-lks-type="image" data-lks-label="LKS Systems image" data-lks-section="General">
+  </a>
+  <div class="portal-user">
+    <span class="topbar-clock" id="topbarClock"></span>
+    <span id="portalUserEmail"></span>
+    <button class="btn btn-ghost" id="logoutBtn" type="button" data-lks-editable="auto-dashboard-button-1" data-lks-type="text" data-lks-label="Log out" data-lks-section="General">Log out</button>
+  </div>
+</div>
+
+<main id="main">
+  <div class="wrap section-tight">
+
+    <div id="configWarning" class="form-alert is-warning" style="display:none; max-width:640px;">
+      The support dashboard isn't fully set up yet.
+    </div>
+
+    <div id="dashContent" style="display:none;">
+      <p class="eyebrow" data-lks-editable="auto-dashboard-p-1" data-lks-type="text" data-lks-label="Support dashboard" data-lks-section="DashContent">Support dashboard</p>
+      <h1 style="margin-top:14px; margin-bottom:32px;" data-lks-editable="auto-dashboard-h1-1" data-lks-type="text" data-lks-label="Everything, in one place." data-lks-section="DashContent">Everything, in one place.</h1>
+
+      <div class="dash-tabs">
+        <button type="button" class="dash-tab is-active" data-tab="tickets" data-lks-editable="auto-dashboard-button-2" data-lks-type="text" data-lks-label="Tickets" data-lks-section="DashContent">Tickets</button>
+        <button type="button" class="dash-tab" data-tab="documents" data-lks-editable="auto-dashboard-button-3" data-lks-type="text" data-lks-label="Documents" data-lks-section="DashContent">Documents</button>
+      </div>
+
+      <!-- TICKETS TAB -->
+      <div id="tabTickets">
+        <div class="status-filters">
+          <button type="button" class="status-filter is-active" data-filter="all" data-lks-editable="auto-dashboard-button-4" data-lks-type="text" data-lks-label="All" data-lks-section="TabTickets">All</button>
+          <button type="button" class="status-filter" data-filter="open" data-lks-editable="auto-dashboard-button-5" data-lks-type="text" data-lks-label="Open" data-lks-section="TabTickets">Open</button>
+          <button type="button" class="status-filter" data-filter="answered" data-lks-editable="auto-dashboard-button-6" data-lks-type="text" data-lks-label="Answered" data-lks-section="TabTickets">Answered</button>
+          <button type="button" class="status-filter" data-filter="closed" data-lks-editable="auto-dashboard-button-7" data-lks-type="text" data-lks-label="Closed" data-lks-section="TabTickets">Closed</button>
+        </div>
+
+        <div class="dash-layout">
+          <div class="dash-list-pane">
+            <div id="dashRows"></div>
+            <div id="dashEmpty" class="dash-empty-state" style="display:none;">No tickets match this filter.</div>
+          </div>
+
+          <div class="dash-detail-pane" id="dashDetailPane">
+            <div class="dash-detail-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              <span>Select a ticket from the list to view the conversation.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTS TAB -->
+      <div id="tabDocuments" style="display:none;">
+        <div class="form-panel" style="max-width:640px; margin-bottom:44px;">
+          <p class="eyebrow" style="margin-bottom:24px;" data-lks-editable="auto-dashboard-p-2" data-lks-type="text" data-lks-label="Upload a document" data-lks-section="TabDocuments">Upload a document</p>
+          <form id="docUploadForm">
+            <div class="form-field">
+              <label for="doc-title" data-lks-editable="auto-dashboard-label-1" data-lks-type="text" data-lks-label="Title" data-lks-section="DocUploadForm">Title</label>
+              <input type="text" id="doc-title" required="" placeholder="e.g. Terms &amp; Conditions">
+            </div>
+            <div class="form-field">
+              <label for="doc-category" data-lks-editable="auto-dashboard-label-2" data-lks-type="text" data-lks-label="Category" data-lks-section="DocUploadForm">Category</label>
+              <select id="doc-category" class="status-select" style="width:100%; border-radius:var(--radius-sm); padding:14px 34px 14px 16px; font-size:.95rem; text-transform:none; letter-spacing:normal;">
+                <option value="terms">Terms &amp; Conditions</option>
+                <option value="contract">Contract</option>
+                <option value="plan">Plan</option>
+                <option value="invoice">Invoice</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="doc-visibility" data-lks-editable="auto-dashboard-label-3" data-lks-type="text" data-lks-label="Visible to" data-lks-section="DocUploadForm">Visible to</label>
+              <select id="doc-visibility" class="status-select" style="width:100%; border-radius:var(--radius-sm); padding:14px 34px 14px 16px; font-size:.95rem; text-transform:none; letter-spacing:normal;">
+                <option value="all">All clients</option>
+                <option value="client">One specific client</option>
+              </select>
+            </div>
+            <div class="form-field" id="doc-client-field" style="display:none;">
+              <label for="doc-client" data-lks-editable="auto-dashboard-label-4" data-lks-type="text" data-lks-label="Client" data-lks-section="Doc Client Field">Client</label>
+              <select id="doc-client" class="status-select" style="width:100%; border-radius:var(--radius-sm); padding:14px 34px 14px 16px; font-size:.95rem; text-transform:none; letter-spacing:normal;"></select>
+            </div>
+            <div class="form-field" id="doc-amount-field" style="display:none;">
+              <label for="doc-amount" data-lks-editable="auto-dashboard-label-5" data-lks-type="text" data-lks-label="Amount (£)" data-lks-section="Doc Amount Field">Amount (£)</label>
+              <input type="number" id="doc-amount" step="0.01" min="0">
+            </div>
+            <div class="form-field" id="doc-status-field" style="display:none;">
+              <label for="doc-status" data-lks-editable="auto-dashboard-label-6" data-lks-type="text" data-lks-label="Status" data-lks-section="Doc Status Field">Status</label>
+              <select id="doc-status" class="status-select" style="width:100%; border-radius:var(--radius-sm); padding:14px 34px 14px 16px; font-size:.95rem; text-transform:none; letter-spacing:normal;"></select>
+            </div>
+            <div class="form-field">
+              <label for="doc-file" data-lks-editable="auto-dashboard-label-7" data-lks-type="text" data-lks-label="File" data-lks-section="DocUploadForm">File</label>
+              <input type="file" id="doc-file" required="" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+            </div>
+            <button type="submit" class="btn btn-primary" id="docUploadSubmit" data-lks-editable="auto-dashboard-button-8" data-lks-type="text" data-lks-label="Upload document" data-lks-section="DocUploadForm">
+              Upload document
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"></line><polyline points="9 5 19 5 19 15"></polyline></svg>
+            </button>
+            <div id="docUploadAlert" class="form-alert"></div>
+          </form>
+        </div>
+
+        <p class="eyebrow" style="margin-bottom:8px;" data-lks-editable="auto-dashboard-p-3" data-lks-type="text" data-lks-label="All documents" data-lks-section="TabDocuments">All documents</p>
+        <div id="docList" class="doc-list"></div>
+        <div id="docEmpty" class="portal-empty" style="display:none;">No documents uploaded yet.</div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="emailjs-client.js"></script>
+<script src="ticket-ui.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var configWarning = document.getElementById("configWarning");
+  var dashContent = document.getElementById("dashContent");
+  var portalUserEmail = document.getElementById("portalUserEmail");
+  var logoutBtn = document.getElementById("logoutBtn");
+  var dashRows = document.getElementById("dashRows");
+  var dashEmpty = document.getElementById("dashEmpty");
+  var dashDetailPane = document.getElementById("dashDetailPane");
+  var filterButtons = document.querySelectorAll(".status-filter");
+  var mainTabs = document.querySelectorAll(".dash-tab");
+  var tabTickets = document.getElementById("tabTickets");
+  var tabDocuments = document.getElementById("tabDocuments");
+
+  /* ---------- live clock (staff dashboard only) ---------- */
+  var topbarClock = document.getElementById("topbarClock");
+  function tickClock() {
+    var now = new Date();
+    var datePart = now.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+    var timePart = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    topbarClock.textContent = datePart + " · " + timePart;
+  }
+  if (topbarClock) {
+    tickClock();
+    setInterval(tickClock, 1000);
+  }
+
+  if (!supabaseConfigured) {
+    configWarning.style.display = "block";
+    logoutBtn.style.display = "none";
+    return;
+  }
+
+  var currentUser = null;
+  var allTickets = [];
+  var currentFilter = "all";
+  var selectedTicketId = null;
+  var clientList = [];
+
+  /* ---------- top-level tabs ---------- */
+  mainTabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      mainTabs.forEach(function (t) { t.classList.remove("is-active"); });
+      tab.classList.add("is-active");
+      var target = tab.getAttribute("data-tab");
+      tabTickets.style.display = target === "tickets" ? "block" : "none";
+      tabDocuments.style.display = target === "documents" ? "block" : "none";
+      if (target === "documents" && clientList.length === 0) loadClients();
+    });
+  });
+
+  /* ================= TICKETS ================= */
+
+  function applyFilter() {
+    if (currentFilter === "all") return allTickets;
+    return allTickets.filter(function (t) { return t.status === currentFilter; });
+  }
+
+  function rowHTML(t) {
+    return (
+      avatarHTML(t.user_email, false) +
+      '<div class="dash-row-body">' +
+        '<div class="dash-row-top"><strong>' + escapeHTML(t.subject) + "</strong>" +
+        '<span class="dash-row-time">' + timeAgo(t.updated_at || t.created_at) + "</span></div>" +
+        '<div class="dash-row-email">' + escapeHTML(t.user_email) + "</div>" +
+        '<div class="dash-row-bottom">' + statusPillHTML(t.status) + priorityBadgeHTML(t.priority) + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderList() {
+    var tickets = applyFilter();
+    dashRows.innerHTML = "";
+    dashEmpty.style.display = tickets.length === 0 ? "block" : "none";
+
+    tickets.forEach(function (t) {
+      var row = document.createElement("button");
+      row.type = "button";
+      row.className = "dash-row" + (t.id === selectedTicketId ? " is-active" : "");
+      row.dataset.ticketId = t.id;
+      row.innerHTML = rowHTML(t);
+      row.addEventListener("click", function () { selectTicket(t.id); });
+      dashRows.appendChild(row);
+    });
+  }
+
+  function detailHeaderHTML(t) {
+    return (
+      '<div>' +
+        '<span class="mono-label">' + escapeHTML(t.user_email) + "</span>" +
+        "<h3>" + escapeHTML(t.subject) + "</h3>" +
+      "</div>" +
+      '<select class="status-select" id="dashStatusSelect">' +
+        '<option value="open"' + (t.status === "open" ? " selected" : "") + ">Open</option>" +
+        '<option value="answered"' + (t.status === "answered" ? " selected" : "") + ">Answered</option>" +
+        '<option value="closed"' + (t.status === "closed" ? " selected" : "") + ">Closed</option>" +
+      "</select>"
+    );
+  }
+
+  function renderDetail(ticket) {
+    dashDetailPane.innerHTML =
+      '<div class="dash-detail-header">' + detailHeaderHTML(ticket) + "</div>" +
+      '<div class="dash-detail-body"><div class="thread-messages" id="dashThread"><span class="loading-shimmer"></span></div></div>' +
+      '<div class="dash-detail-footer">' +
+        '<form class="thread-reply" id="dashReplyForm">' +
+          '<textarea placeholder="Reply as LKS Support…" required></textarea>' +
+          '<button type="submit" class="btn btn-primary">Send</button>' +
+        "</form>" +
+      "</div>";
+
+    document.getElementById("dashStatusSelect").addEventListener("change", function (e) {
+      updateStatus(ticket.id, e.target.value);
+    });
+
+    document.getElementById("dashReplyForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      sendReply(ticket.id, e.target);
+    });
+
+    loadThread(ticket.id);
+  }
+
+  function loadThread(ticketId) {
+    var container = document.getElementById("dashThread");
+    var ticket = allTickets.find(function (t) { return t.id === ticketId; });
+    if (!container || !ticket) return;
+
+    supabaseClient
+      .from("ticket_replies")
+      .select("*")
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: true })
+      .then(function (result) {
+        renderThread(container, ticket, result.error ? [] : result.data);
+      });
+  }
+
+  function selectTicket(id) {
+    selectedTicketId = id;
+    renderList();
+    var ticket = allTickets.find(function (t) { return t.id === id; });
+    if (ticket) renderDetail(ticket);
+  }
+
+  function updateStatus(ticketId, newStatus) {
+    supabaseClient
+      .from("tickets")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", ticketId)
+      .then(function (result) {
+        if (result.error) return;
+        loadTickets(true);
+      });
+  }
+
+  function sendReply(ticketId, form) {
+    var textarea = form.querySelector("textarea");
+    var message = textarea.value.trim();
+    if (!message || !currentUser) return;
+
+    var btn = form.querySelector("button");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+
+    supabaseClient
+      .from("ticket_replies")
+      .insert({
+        ticket_id: ticketId,
+        sender_id: currentUser.id,
+        sender_role: "staff",
+        sender_email: currentUser.email,
+        message: message
+      })
+      .then(function (result) {
+        if (result.error) throw result.error;
+
+        var ticket = allTickets.find(function (t) { return t.id === ticketId; });
+        var newStatus = ticket && ticket.status === "open" ? "answered" : (ticket ? ticket.status : "open");
+
+        if (ticket) {
+          sendTicketNotification(ticket.user_email, ticket.subject, "LKS Systems replied to your ticket", message, ticketId);
+        }
+
+        return supabaseClient
+          .from("tickets")
+          .update({ updated_at: new Date().toISOString(), status: newStatus })
+          .eq("id", ticketId);
+      })
+      .then(function () {
+        textarea.value = "";
+        return loadTickets(true);
+      })
+      .catch(function () {
+        alert("Couldn't send that reply — please try again.");
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Send";
+      });
+  }
+
+  function loadTickets(keepSelection) {
+    return supabaseClient
+      .from("tickets")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) return;
+        allTickets = result.data || [];
+        renderList();
+        if (keepSelection && selectedTicketId) {
+          var ticket = allTickets.find(function (t) { return t.id === selectedTicketId; });
+          if (ticket) renderDetail(ticket);
+        }
+      });
+  }
+
+  filterButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      filterButtons.forEach(function (b) { b.classList.remove("is-active"); });
+      btn.classList.add("is-active");
+      currentFilter = btn.getAttribute("data-filter");
+      renderList();
+    });
+  });
+
+  /* ================= DOCUMENTS ================= */
+
+  var docCategory = document.getElementById("doc-category");
+  var docVisibility = document.getElementById("doc-visibility");
+  var docClientField = document.getElementById("doc-client-field");
+  var docClientSelect = document.getElementById("doc-client");
+  var docAmountField = document.getElementById("doc-amount-field");
+  var docStatusField = document.getElementById("doc-status-field");
+  var docStatusSelect = document.getElementById("doc-status");
+  var docUploadForm = document.getElementById("docUploadForm");
+  var docUploadSubmit = document.getElementById("docUploadSubmit");
+  var docUploadAlert = document.getElementById("docUploadAlert");
+  var docList = document.getElementById("docList");
+  var docEmpty = document.getElementById("docEmpty");
+
+  var STATUS_OPTIONS = {
+    invoice: ["unpaid", "paid"],
+    plan: ["active", "inactive"]
+  };
+
+  function loadClients() {
+    supabaseClient
+      .from("profiles")
+      .select("id,email")
+      .eq("role", "client")
+      .order("email")
+      .then(function (result) {
+        if (result.error) return;
+        clientList = result.data || [];
+        docClientSelect.innerHTML = clientList
+          .map(function (c) { return '<option value="' + c.id + '">' + escapeHTML(c.email) + "</option>"; })
+          .join("");
+      });
+  }
+
+  function syncDocFormVisibility() {
+    docClientField.style.display = docVisibility.value === "client" ? "block" : "none";
+
+    var cat = docCategory.value;
+    var statusOptions = STATUS_OPTIONS[cat];
+    docAmountField.style.display = cat === "invoice" ? "block" : "none";
+    if (statusOptions) {
+      docStatusField.style.display = "block";
+      docStatusSelect.innerHTML = statusOptions
+        .map(function (s) { return '<option value="' + s + '">' + s.charAt(0).toUpperCase() + s.slice(1) + "</option>"; })
+        .join("");
+    } else {
+      docStatusField.style.display = "none";
+    }
+  }
+
+  docVisibility.addEventListener("change", syncDocFormVisibility);
+  docCategory.addEventListener("change", syncDocFormVisibility);
+  syncDocFormVisibility();
+
+  function docItemHTML(d) {
+    var metaBits = [categoryLabel(d.category), formatDateTime(d.created_at)];
+    if (d.visibility === "client") {
+      var owner = clientList.find(function (c) { return c.id === d.user_id; });
+      metaBits.splice(1, 0, owner ? owner.email : "specific client");
+    } else {
+      metaBits.splice(1, 0, "all clients");
+    }
+    var amountHTML = d.amount != null ? '<span class="category-badge">£' + Number(d.amount).toFixed(2) + "</span>" : "";
+    var statusHTML = documentStatusPillHTML(d.status);
+
+    return (
+      '<div class="doc-item-left">' +
+        '<span class="doc-icon">' + categoryIconHTML() + "</span>" +
+        '<div class="doc-info">' +
+          "<h4>" + escapeHTML(d.title) + "</h4>" +
+          '<div class="doc-info-meta">' +
+            '<span class="category-badge">' + escapeHTML(categoryLabel(d.category)) + "</span>" +
+            metaBits.slice(1).map(function (b) { return "<span>" + escapeHTML(b) + "</span>"; }).join("") +
+            amountHTML + statusHTML +
+          "</div>" +
+        "</div>" +
+      "</div>" +
+      '<div class="doc-actions">' +
+        '<button type="button" class="btn btn-ghost" data-view="' + d.file_path + '">View</button>' +
+        '<button type="button" class="btn btn-ghost" data-delete="' + d.id + '" data-path="' + d.file_path + '">Delete</button>' +
+      "</div>"
+    );
+  }
+
+  function loadDocuments() {
+    supabaseClient
+      .from("client_files")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) return;
+        var docs = result.data || [];
+        docList.innerHTML = "";
+        docEmpty.style.display = docs.length === 0 ? "block" : "none";
+        docs.forEach(function (d) {
+          var item = document.createElement("div");
+          item.className = "doc-item";
+          item.innerHTML = docItemHTML(d);
+          docList.appendChild(item);
+        });
+      });
+  }
+
+  docList.addEventListener("click", function (e) {
+    var viewBtn = e.target.closest("[data-view]");
+    if (viewBtn) {
+      openSignedDocument(supabaseClient, viewBtn.getAttribute("data-view"), viewBtn);
+      return;
+    }
+    var delBtn = e.target.closest("[data-delete]");
+    if (delBtn) {
+      if (!confirm("Delete this document? This can't be undone.")) return;
+      var id = delBtn.getAttribute("data-delete");
+      var path = delBtn.getAttribute("data-path");
+      supabaseClient.storage.from("client-documents").remove([path]).finally(function () {
+        supabaseClient.from("client_files").delete().eq("id", id).then(function () {
+          loadDocuments();
+        });
+      });
+    }
+  });
+
+  docUploadForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    var fileInput = document.getElementById("doc-file");
+    var file = fileInput.files[0];
+    if (!file) return;
+
+    var visibility = docVisibility.value;
+    var clientId = visibility === "client" ? docClientSelect.value : null;
+    if (visibility === "client" && !clientId) {
+      docUploadAlert.textContent = "Pick a client first.";
+      docUploadAlert.className = "form-alert is-error is-visible";
+      return;
+    }
+
+    var folder = visibility === "all" ? "general" : clientId;
+    var path = folder + "/" + Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+
+    docUploadSubmit.disabled = true;
+    docUploadSubmit.textContent = "Uploading…";
+    docUploadAlert.className = "form-alert";
+
+    supabaseClient.storage
+      .from("client-documents")
+      .upload(path, file)
+      .then(function (result) {
+        if (result.error) throw result.error;
+
+        return supabaseClient.from("client_files").insert({
+          title: document.getElementById("doc-title").value.trim(),
+          category: docCategory.value,
+          visibility: visibility,
+          user_id: clientId,
+          file_path: path,
+          amount: docAmountField.style.display === "block" && document.getElementById("doc-amount").value !== ""
+            ? Number(document.getElementById("doc-amount").value)
+            : null,
+          status: docStatusField.style.display === "block" ? docStatusSelect.value : null
+        });
+      })
+      .then(function (result) {
+        if (result.error) throw result.error;
+        docUploadForm.reset();
+        syncDocFormVisibility();
+        docUploadAlert.textContent = "Document uploaded.";
+        docUploadAlert.className = "form-alert is-success is-visible";
+        loadDocuments();
+      })
+      .catch(function () {
+        docUploadAlert.textContent = "Couldn't upload that document — please try again.";
+        docUploadAlert.className = "form-alert is-error is-visible";
+      })
+      .finally(function () {
+        docUploadSubmit.disabled = false;
+        docUploadSubmit.innerHTML = 'Upload document <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9 5 19 5 19 15"/></svg>';
+      });
+  });
+
+  /* ================= AUTH GATE ================= */
+
+  supabaseClient.auth.getSession().then(function (result) {
+    var session = result.data && result.data.session;
+    if (!session) {
+      window.location.href = "/login";
+      return;
+    }
+    currentUser = session.user;
+    portalUserEmail.textContent = currentUser.email;
+
+    supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", currentUser.id)
+      .single()
+      .then(function (result) {
+        if (!result.data || result.data.role !== "staff") {
+          window.location.href = "/portal";
+          return;
+        }
+        dashContent.style.display = "block";
+        loadTickets();
+        loadDocuments();
+      });
+  });
+
+  logoutBtn.addEventListener("click", function () {
+    supabaseClient.auth.signOut().then(function () {
+      window.location.href = "/login";
+    });
+  });
+})();
+</script>
+
+
+</body></html>

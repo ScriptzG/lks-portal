@@ -1,0 +1,437 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Portal — LKS Systems</title>
+<meta name="description" content="Submit and track support tickets with LKS Systems.">
+<meta name="theme-color" content="#050506">
+<meta name="robots" content="noindex">
+
+<link rel="icon" href="lks.png" type="image/png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="field" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="portal-topbar">
+  <a href="index.html" class="nav-brand">
+    <img src="lks.png" alt="LKS Systems" data-lks-editable="auto-portal-img-1" data-lks-type="image" data-lks-label="LKS Systems image" data-lks-section="General">
+  </a>
+  <div class="portal-user">
+    <span id="portalUserEmail"></span>
+    <button class="btn btn-ghost" id="logoutBtn" type="button" data-lks-editable="auto-portal-button-1" data-lks-type="text" data-lks-label="Log out" data-lks-section="General">Log out</button>
+  </div>
+</div>
+
+<main id="main">
+  <div class="wrap section-tight">
+
+    <div id="configWarning" class="form-alert is-warning" style="display:none; max-width:640px;">
+      The client portal isn't fully set up yet — check back soon, or
+      <a href="contact.html" class="text-link" data-lks-editable="auto-portal-a-1" data-lks-type="text" data-lks-label="get in touch" data-lks-section="ConfigWarning">get in touch</a> directly.
+    </div>
+
+    <div id="portalContent" style="display:none;">
+      <p class="eyebrow" data-lks-editable="auto-portal-p-1" data-lks-type="text" data-lks-label="Client portal" data-lks-section="PortalContent">Client portal</p>
+      <h1 style="margin-top:14px; margin-bottom:32px;" data-lks-editable="auto-portal-h1-1" data-lks-type="text" data-lks-label="Welcome back." data-lks-section="PortalContent">Welcome back.</h1>
+
+      <div class="dash-tabs">
+        <button type="button" class="dash-tab is-active" data-tab="support" data-lks-editable="auto-portal-button-2" data-lks-type="text" data-lks-label="Support" data-lks-section="PortalContent">Support</button>
+        <button type="button" class="dash-tab" data-tab="documents" data-lks-editable="auto-portal-button-3" data-lks-type="text" data-lks-label="Documents" data-lks-section="PortalContent">Documents</button>
+      </div>
+
+      <!-- SUPPORT TAB -->
+      <div id="tabSupport">
+        <div class="form-panel" style="max-width:640px;">
+          <p class="eyebrow" style="margin-bottom:24px;" data-lks-editable="auto-portal-p-2" data-lks-type="text" data-lks-label="File a support ticket" data-lks-section="TabSupport">File a support ticket</p>
+          <form id="ticketForm">
+            <div class="form-field">
+              <label for="ticket-subject" data-lks-editable="auto-portal-label-1" data-lks-type="text" data-lks-label="Subject" data-lks-section="TicketForm">Subject</label>
+              <input type="text" id="ticket-subject" name="subject" required="">
+            </div>
+            <div class="form-field">
+              <label for="ticket-priority" data-lks-editable="auto-portal-label-2" data-lks-type="text" data-lks-label="Priority" data-lks-section="TicketForm">Priority</label>
+              <select id="ticket-priority" name="priority" style="width:100%; background:transparent; border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:14px 16px; color:var(--text); font-family:var(--f-sans); font-size:.98rem;">
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="ticket-message" data-lks-editable="auto-portal-label-3" data-lks-type="text" data-lks-label="What's going on?" data-lks-section="TicketForm">What's going on?</label>
+              <textarea id="ticket-message" name="message" required=""></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" id="ticketSubmit" data-lks-editable="auto-portal-button-4" data-lks-type="text" data-lks-label="Submit ticket" data-lks-section="TicketForm">
+              Submit ticket
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"></line><polyline points="9 5 19 5 19 15"></polyline></svg>
+            </button>
+            <div id="ticketAlert" class="form-alert"></div>
+          </form>
+        </div>
+
+        <p class="eyebrow" style="margin-top:64px;" data-lks-editable="auto-portal-p-3" data-lks-type="text" data-lks-label="Your tickets" data-lks-section="TabSupport">Your tickets</p>
+        <p class="form-note" style="margin-top:8px; margin-bottom:24px;" data-lks-editable="auto-portal-p-4" data-lks-type="text" data-lks-label="Click a ticket to see the full conversatio…" data-lks-section="TabSupport">Click a ticket to see the full conversation and reply.</p>
+        <div id="ticketList" class="ticket-list"></div>
+        <div id="ticketEmpty" class="portal-empty" style="display:none;">No tickets yet — submit one above and it'll show up here.</div>
+      </div>
+
+      <!-- DOCUMENTS TAB -->
+      <div id="tabDocuments" style="display:none;">
+        <p class="eyebrow" style="margin-bottom:8px;" data-lks-editable="auto-portal-p-5" data-lks-type="text" data-lks-label="Your documents" data-lks-section="TabDocuments">Your documents</p>
+        <p class="form-note" style="margin-top:8px; margin-bottom:24px;" data-lks-editable="auto-portal-p-6" data-lks-type="text" data-lks-label="Terms, contracts, plans and invoices share…" data-lks-section="TabDocuments">Terms, contracts, plans and invoices shared with you.</p>
+        <div id="docList" class="doc-list"></div>
+        <div id="docEmpty" class="portal-empty" style="display:none;">Nothing's been shared with you yet.</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="ticket-ui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="emailjs-client.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var WEB3FORMS_ACCESS_KEY = "36397aa3-9a9b-4016-b795-4a80bc779509";
+
+  var configWarning = document.getElementById("configWarning");
+  var portalContent = document.getElementById("portalContent");
+  var portalUserEmail = document.getElementById("portalUserEmail");
+  var logoutBtn = document.getElementById("logoutBtn");
+  var ticketForm = document.getElementById("ticketForm");
+  var ticketSubmit = document.getElementById("ticketSubmit");
+  var ticketAlert = document.getElementById("ticketAlert");
+  var ticketList = document.getElementById("ticketList");
+  var ticketEmpty = document.getElementById("ticketEmpty");
+
+  if (!supabaseConfigured) {
+    configWarning.style.display = "block";
+    logoutBtn.style.display = "none";
+    return;
+  }
+
+  var currentUser = null;
+  var openTicketId = new URLSearchParams(window.location.search).get("ticket");
+
+  /* ---------- tabs ---------- */
+  var mainTabs = document.querySelectorAll(".dash-tab");
+  var tabSupport = document.getElementById("tabSupport");
+  var tabDocuments = document.getElementById("tabDocuments");
+  var docsLoaded = false;
+
+  mainTabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      mainTabs.forEach(function (t) { t.classList.remove("is-active"); });
+      tab.classList.add("is-active");
+      var target = tab.getAttribute("data-tab");
+      tabSupport.style.display = target === "support" ? "block" : "none";
+      tabDocuments.style.display = target === "documents" ? "block" : "none";
+      if (target === "documents" && !docsLoaded) { docsLoaded = true; loadDocuments(); }
+    });
+  });
+
+  /* ---------- documents ---------- */
+  var docList = document.getElementById("docList");
+  var docEmpty = document.getElementById("docEmpty");
+
+  function docItemHTML(d) {
+    var amountHTML = d.amount != null ? '<span class="category-badge">£' + Number(d.amount).toFixed(2) + "</span>" : "";
+    var statusHTML = documentStatusPillHTML(d.status);
+    return (
+      '<div class="doc-item-left">' +
+        '<span class="doc-icon">' + categoryIconHTML() + "</span>" +
+        '<div class="doc-info">' +
+          "<h4>" + escapeHTML(d.title) + "</h4>" +
+          '<div class="doc-info-meta">' +
+            '<span class="category-badge">' + escapeHTML(categoryLabel(d.category)) + "</span>" +
+            "<span>" + formatDateTime(d.created_at) + "</span>" +
+            amountHTML + statusHTML +
+          "</div>" +
+        "</div>" +
+      "</div>" +
+      '<div class="doc-actions">' +
+        '<button type="button" class="btn btn-ghost" data-view="' + d.file_path + '">View</button>' +
+      "</div>"
+    );
+  }
+
+  function loadDocuments() {
+    supabaseClient
+      .from("client_files")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) return;
+        var docs = result.data || [];
+        docList.innerHTML = "";
+        docEmpty.style.display = docs.length === 0 ? "block" : "none";
+        docs.forEach(function (d) {
+          var item = document.createElement("div");
+          item.className = "doc-item";
+          item.innerHTML = docItemHTML(d);
+          docList.appendChild(item);
+        });
+      });
+  }
+
+  docList.addEventListener("click", function (e) {
+    var viewBtn = e.target.closest("[data-view]");
+    if (!viewBtn) return;
+    openSignedDocument(supabaseClient, viewBtn.getAttribute("data-view"), viewBtn);
+  });
+
+  function ticketItemHTML(t) {
+    var date = formatDateTime(t.created_at);
+    return (
+      '<button type="button" class="ticket-header" data-ticket-id="' + t.id + '">' +
+        "<div>" +
+          "<h4>" + escapeHTML(t.subject) + "</h4>" +
+          "<p>" + escapeHTML(t.message) + "</p>" +
+          '<span class="ticket-meta"><span>' + date + "</span>" + priorityBadgeHTML(t.priority) + "</span>" +
+        "</div>" +
+        '<div class="ticket-header-right">' +
+          statusPillHTML(t.status) +
+          '<span class="ticket-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>' +
+        "</div>" +
+      "</button>" +
+      '<div class="ticket-thread">' +
+        '<div class="ticket-thread-inner">' +
+          '<div class="thread-messages" data-thread-for="' + t.id + '"><span class="form-note">Loading conversation…</span></div>' +
+          '<form class="thread-reply" data-reply-form="' + t.id + '">' +
+            '<textarea placeholder="Write a reply…" required></textarea>' +
+            '<button type="submit" class="btn btn-ghost">Send</button>' +
+          "</form>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderTickets(tickets) {
+    ticketList.innerHTML = "";
+    if (!tickets || tickets.length === 0) {
+      ticketEmpty.style.display = "block";
+      return;
+    }
+    ticketEmpty.style.display = "none";
+    tickets.forEach(function (t) {
+      var item = document.createElement("div");
+      item.className = "ticket-item";
+      item.dataset.ticketId = t.id;
+      item.dataset.ticketData = JSON.stringify(t);
+      item.innerHTML = ticketItemHTML(t);
+      ticketList.appendChild(item);
+    });
+
+    if (openTicketId) {
+      var reopen = ticketList.querySelector('.ticket-item[data-ticket-id="' + openTicketId + '"]');
+      if (reopen) {
+        reopen.classList.add("is-open");
+        loadThread(openTicketId);
+        reopen.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }
+
+  function loadTickets() {
+    return supabaseClient
+      .from("tickets")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .then(function (result) {
+        if (result.error) return;
+        renderTickets(result.data);
+      });
+  }
+
+  function loadThread(ticketId) {
+    var container = ticketList.querySelector('[data-thread-for="' + ticketId + '"]');
+    var item = ticketList.querySelector('.ticket-item[data-ticket-id="' + ticketId + '"]');
+    if (!container || !item) return;
+    var ticket = JSON.parse(item.dataset.ticketData);
+
+    supabaseClient
+      .from("ticket_replies")
+      .select("*")
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: true })
+      .then(function (result) {
+        renderThread(container, ticket, result.error ? [] : result.data);
+      });
+  }
+
+  ticketList.addEventListener("click", function (e) {
+    var header = e.target.closest(".ticket-header");
+    if (!header) return;
+    var id = header.getAttribute("data-ticket-id");
+    var item = header.closest(".ticket-item");
+    var wasOpen = item.classList.contains("is-open");
+
+    ticketList.querySelectorAll(".ticket-item.is-open").forEach(function (el) {
+      el.classList.remove("is-open");
+    });
+
+    if (!wasOpen) {
+      item.classList.add("is-open");
+      openTicketId = id;
+      loadThread(id);
+    } else {
+      openTicketId = null;
+    }
+  });
+
+  ticketList.addEventListener("submit", function (e) {
+    var form = e.target.closest("[data-reply-form]");
+    if (!form) return;
+    e.preventDefault();
+
+    var ticketId = form.getAttribute("data-reply-form");
+    var textarea = form.querySelector("textarea");
+    var message = textarea.value.trim();
+    if (!message || !currentUser) return;
+
+    var btn = form.querySelector("button");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+
+    supabaseClient
+      .from("ticket_replies")
+      .insert({
+        ticket_id: ticketId,
+        sender_id: currentUser.id,
+        sender_role: "client",
+        sender_email: currentUser.email,
+        message: message
+      })
+      .then(function (result) {
+        if (result.error) throw result.error;
+
+        var item = ticketList.querySelector('.ticket-item[data-ticket-id="' + ticketId + '"]');
+        var ticket = JSON.parse(item.dataset.ticketData);
+        var newStatus = ticket.status === "answered" ? "open" : ticket.status;
+
+        return supabaseClient
+          .from("tickets")
+          .update({ updated_at: new Date().toISOString(), status: newStatus })
+          .eq("id", ticketId);
+      })
+      .then(function () {
+        textarea.value = "";
+        openTicketId = ticketId;
+        loadTickets();
+      })
+      .catch(function () {
+        alert("Couldn't send that reply — please try again.");
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Send";
+      });
+  });
+
+  supabaseClient.auth.getSession().then(function (result) {
+    var session = result.data && result.data.session;
+    if (!session) {
+      window.location.href = "/login";
+      return;
+    }
+    currentUser = session.user;
+    portalUserEmail.textContent = currentUser.email;
+
+    supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", currentUser.id)
+      .single()
+      .then(function (result) {
+        if (result.data && result.data.role === "staff") {
+          window.location.href = "/dashboard";
+          return;
+        }
+        portalContent.style.display = "block";
+        loadTickets();
+      });
+  });
+
+  logoutBtn.addEventListener("click", function () {
+    supabaseClient.auth.signOut().then(function () {
+      window.location.href = "/login";
+    });
+  });
+
+  ticketForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    var subject = document.getElementById("ticket-subject").value.trim();
+    var priority = document.getElementById("ticket-priority").value;
+    var message = document.getElementById("ticket-message").value.trim();
+
+    ticketSubmit.disabled = true;
+    ticketSubmit.textContent = "Submitting…";
+    ticketAlert.className = "form-alert";
+
+    supabaseClient
+      .from("tickets")
+      .insert({
+        user_id: currentUser.id,
+        user_email: currentUser.email,
+        subject: subject,
+        message: message,
+        priority: priority,
+        status: "open"
+      })
+      .select()
+      .single()
+      .then(function (result) {
+        if (result.error) throw result.error;
+        var newTicket = result.data;
+
+        /* also email Louis immediately, same service as the contact form */
+        fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            access_key: WEB3FORMS_ACCESS_KEY,
+            subject: "New support ticket — " + subject,
+            from_name: currentUser.email,
+            message: "From: " + currentUser.email + "\nPriority: " + priority + "\n\n" + message
+          })
+        }).catch(function () {});
+
+        sendTicketNotification(
+          currentUser.email,
+          subject,
+          "We've received your ticket",
+          "Thanks — we've got your message and will get back to you as soon as possible.",
+          newTicket.id
+        );
+
+        ticketForm.reset();
+        ticketAlert.textContent = "Ticket submitted — we'll be in touch.";
+        ticketAlert.className = "form-alert is-success is-visible";
+        loadTickets();
+      })
+      .catch(function () {
+        ticketAlert.textContent = "Couldn't submit that ticket — please try again or email us directly.";
+        ticketAlert.className = "form-alert is-error is-visible";
+      })
+      .finally(function () {
+        ticketSubmit.disabled = false;
+        ticketSubmit.innerHTML = 'Submit ticket <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9 5 19 5 19 15"/></svg>';
+      });
+  });
+})();
+</script>
+
+
+</body></html>
