@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 import { notifyAllAdmins, notifyUser, sendEmail } from "../lib/notify.js";
 
 export const documentsRouter = Router();

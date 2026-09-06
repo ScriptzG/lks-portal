@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireWebsiteAccess } from "../middleware/websiteAccess.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 import { deployService } from "../services/deploy/MockNetlifyService.js";
 import { compileHtml } from "../lib/compileSite.js";
 import { notifyUser, sendEmail } from "../lib/notify.js";

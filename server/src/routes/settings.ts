@@ -4,7 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 import { env } from "../lib/env.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });

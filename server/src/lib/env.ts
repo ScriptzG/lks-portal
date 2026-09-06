@@ -25,4 +25,7 @@ export const env = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   emailFrom: process.env.EMAIL_FROM ?? "LKS Systems <no-reply@lks.systems>",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? "lks-storage",
 };

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 import { compileHtml } from "./compileSite.js";
 
 function filesDir(websiteId: string) {

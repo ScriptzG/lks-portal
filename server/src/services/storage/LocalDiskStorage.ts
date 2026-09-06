@@ -57,5 +57,3 @@ export class LocalDiskStorage implements StorageService {
     return entries;
   }
 }
-
-export const storageService: StorageService = new LocalDiskStorage();

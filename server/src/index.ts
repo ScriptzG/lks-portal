@@ -9,8 +9,9 @@ import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import path from "node:path";
+import mime from "mime-types";
 import { env } from "./lib/env.js";
+import { storageService } from "./services/storage/index.js";
 import { authRouter } from "./routes/auth.js";
 import { companiesRouter } from "./routes/companies.js";
 import { contactsRouter } from "./routes/contacts.js";
@@ -43,8 +44,19 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: "5mb" }));
 
-// Serves uploaded website files/assets directly, used as the base for the client live-preview iframe.
-app.use("/storage", express.static(path.resolve(process.cwd(), "storage")));
+// Serves uploaded website files/assets directly, used as the base for the client live-preview
+// iframe. Streamed through storageService rather than express.static so this works the same way
+// whether files live on local disk (dev) or in Supabase Storage (production).
+app.get("/storage/*", async (req, res) => {
+  const relativePath = (req.params as unknown as Record<string, string>)[0];
+  try {
+    const contents = await storageService.read(relativePath);
+    res.setHeader("Content-Type", mime.lookup(relativePath) || "application/octet-stream");
+    res.send(contents);
+  } catch {
+    res.status(404).send("Not found");
+  }
+});
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, mockServices: env.mockServices }));
 

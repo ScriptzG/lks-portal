@@ -4,7 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 
 export const companiesRouter = Router();
 companiesRouter.use(requireAuth, requireRole("admin"));

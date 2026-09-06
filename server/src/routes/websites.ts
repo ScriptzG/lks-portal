@@ -9,7 +9,7 @@ import * as cheerio from "cheerio";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireWebsiteAccess } from "../middleware/websiteAccess.js";
-import { storageService } from "../services/storage/LocalDiskStorage.js";
+import { storageService } from "../services/storage/index.js";
 import { parseEditableFields } from "../lib/editableFieldsParser.js";
 import { autoAnnotateHtml } from "../lib/autoAnnotateHtml.js";
 import { compileHtml } from "../lib/compileSite.js";
