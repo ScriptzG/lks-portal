@@ -1,10 +1,9 @@
-const BASE = "/api";
-
-// File uploads go straight to the API server rather than through Netlify's proxy redirect,
-// which silently rejects large request bodies (confirmed: a 24MB upload fails in <1s through the
-// proxy but succeeds directly against Render). Everything else stays on the relative, proxied
-// BASE — it's simpler and avoids cross-site cookie edge cases where it isn't needed.
-const DIRECT_BASE = "https://lks-portal.onrender.com/api";
+// Talks to the API directly rather than through Netlify's proxy redirect, which silently rejects
+// large request bodies (confirmed: a 24MB upload fails in <1s through the proxy but succeeds
+// directly against Render) — and since login also happens over this same origin, the auth cookie
+// is scoped to it consistently rather than only ever existing for the proxied origin. Local dev
+// keeps the relative path so Vite's own dev-server proxy (see vite.config.ts) still applies.
+const BASE = import.meta.env.DEV ? "/api" : "https://lks-portal.onrender.com/api";
 
 export class ApiError extends Error {
   status: number;
@@ -47,21 +46,6 @@ const patch = <T>(path: string, body?: unknown) => request<T>(path, { method: "P
 const put = <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) });
 const del = <T>(path: string) => request<T>(path, { method: "DELETE" });
 
-async function uploadDirect<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(`${DIRECT_BASE}${path}`, { method: "POST", credentials: "include", body: formData });
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      const data = await res.json();
-      message = typeof data.error === "string" ? data.error : message;
-    } catch {
-      // ignore, use default message
-    }
-    throw new ApiError(message || "Request failed", res.status);
-  }
-  return res.json();
-}
-
 export const api = {
   auth: {
     login: (email: string, password: string) => post<{ id: string; email: string; role: string; companyId: string | null }>("/auth/login", { email, password }),
@@ -92,7 +76,7 @@ export const api = {
     uploadLogo: (id: string, file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return uploadDirect<any>(`/companies/${id}/logo`, formData);
+      return post<any>(`/companies/${id}/logo`, formData);
     },
   },
   documents: {
@@ -100,7 +84,7 @@ export const api = {
     upload: (companyId: string, file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return uploadDirect<any>(`/documents/${companyId}`, formData);
+      return post<any>(`/documents/${companyId}`, formData);
     },
     remove: (id: string) => del(`/documents/${id}`),
   },
@@ -131,7 +115,7 @@ export const api = {
     upload: (id: string, file: File) => {
       const formData = new FormData();
       formData.append("zip", file);
-      return uploadDirect<{ website: any; filesUploaded: number; fieldsFound: number }>(`/websites/${id}/upload`, formData);
+      return post<{ website: any; filesUploaded: number; fieldsFound: number }>(`/websites/${id}/upload`, formData);
     },
     files: (id: string) => get<any[]>(`/websites/${id}/files`),
     readFile: (id: string, filePath: string) =>
@@ -144,13 +128,13 @@ export const api = {
       const params = new URLSearchParams({ mode: opts.mode ?? "draft", t: String(Date.now()) });
       if (opts.file) params.set("file", opts.file);
       if (opts.edit) params.set("edit", "1");
-      return `/api/websites/${id}/preview?${params.toString()}`;
+      return `${BASE}/websites/${id}/preview?${params.toString()}`;
     },
     pages: (id: string) => get<{ filePath: string; label: string }[]>(`/websites/${id}/pages`),
     uploadAsset: (id: string, file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return uploadDirect<{ path: string }>(`/websites/${id}/assets`, formData);
+      return post<{ path: string }>(`/websites/${id}/assets`, formData);
     },
   },
   fields: {
@@ -208,7 +192,7 @@ export const api = {
     uploadBrandLogo: (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return uploadDirect<{ brandLogoUrl: string }>("/settings/branding/logo", formData);
+      return post<{ brandLogoUrl: string }>("/settings/branding/logo", formData);
     },
   },
   dashboard: {
