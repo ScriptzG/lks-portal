@@ -29,11 +29,13 @@ import { extrasRouter } from "./routes/extras.js";
 
 const app = express();
 
+class CorsOriginError extends Error {}
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin || env.clientOrigins.includes(origin)) return callback(null, true);
-      callback(new Error("Not allowed by CORS"));
+      callback(new CorsOriginError(`Origin ${origin} is not in CLIENT_ORIGIN`));
     },
     credentials: true,
   })
@@ -63,6 +65,10 @@ app.use("/api/tickets", ticketsRouter);
 app.use("/api/extras", extrasRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof CorsOriginError) {
+    console.error(err.message);
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
