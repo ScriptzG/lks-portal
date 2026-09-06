@@ -11,12 +11,20 @@ import type { Role } from "../lib/types.js";
 export const authRouter = Router();
 
 const COOKIE_NAME = "lks_token";
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: false,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
+
+// Large file uploads bypass Netlify's proxy and go straight to this API's own origin (its proxy
+// silently rejects big request bodies), which makes those requests cross-site from the browser's
+// point of view — a SameSite=Lax cookie would never be attached to them. SameSite=None requires
+// Secure, so on a plain http:// request (local dev) this falls back to Lax/non-Secure instead,
+// which still works fine there since the client and API share an origin through Vite's proxy.
+function cookieOptions(req: { secure: boolean }) {
+  return {
+    httpOnly: true,
+    sameSite: (req.secure ? "none" : "lax") as "none" | "lax",
+    secure: req.secure,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+}
 
 authRouter.post("/login", async (req, res) => {
   const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
@@ -34,12 +42,12 @@ authRouter.post("/login", async (req, res) => {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
   const token = signToken({ id: user.id, email: user.email, role: user.role as Role, companyId: user.companyId });
-  res.cookie(COOKIE_NAME, token, cookieOptions);
+  res.cookie(COOKIE_NAME, token, cookieOptions(req));
   res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
 });
 
-authRouter.post("/logout", (_req, res) => {
-  res.clearCookie(COOKIE_NAME);
+authRouter.post("/logout", (req, res) => {
+  res.clearCookie(COOKIE_NAME, cookieOptions(req));
   res.json({ ok: true });
 });
 
@@ -88,7 +96,7 @@ authRouter.post("/accept-invite", async (req, res) => {
   await prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } });
 
   const token = signToken({ id: user.id, email: user.email, role: user.role as Role, companyId: user.companyId });
-  res.cookie(COOKIE_NAME, token, cookieOptions);
+  res.cookie(COOKIE_NAME, token, cookieOptions(req));
   res.json({ id: user.id, email: user.email, role: user.role, companyId: user.companyId });
 });
 

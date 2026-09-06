@@ -30,6 +30,10 @@ import { extrasRouter } from "./routes/extras.js";
 
 const app = express();
 
+// Render terminates TLS at a proxy in front of this process, so without this, req.secure is
+// always false and the cookie logic below could never detect a real HTTPS request.
+app.set("trust proxy", 1);
+
 class CorsOriginError extends Error {}
 
 app.use(
