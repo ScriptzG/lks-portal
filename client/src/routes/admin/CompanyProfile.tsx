@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Mail, ShieldOff, ShieldCheck, Star, Upload, Building2 } from "lucide-react";
+import { Plus, Mail, ShieldOff, ShieldCheck, Star, Upload, Building2, MoreVertical, Bell, GraduationCap } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { MessageThread } from "@/components/MessageThread";
 import { DocumentList } from "@/components/DocumentList";
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toaster";
 import { formatDate } from "@/lib/utils";
@@ -26,6 +27,7 @@ export function CompanyProfile() {
   const { toast } = useToast();
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [notifyTarget, setNotifyTarget] = useState<{ id: string; email: string } | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,6 +67,24 @@ export function CompanyProfile() {
       queryClient.invalidateQueries({ queryKey: ["adminClients"] });
       toast({ title: "Access updated", variant: "success" });
     },
+  });
+
+  const notifyMutation = useMutation({
+    mutationFn: ({ userId, message }: { userId: string; message: string }) => api.adminClients.notify(userId, message),
+    onSuccess: () => {
+      toast({ title: "Notification sent", variant: "success" });
+      setNotifyTarget(null);
+    },
+    onError: (err) => toast({ title: "Could not send notification", description: (err as ApiError).message, variant: "error" }),
+  });
+
+  const resetTutorialMutation = useMutation({
+    mutationFn: (userId: string) => api.adminClients.resetTutorial(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminClients"] });
+      toast({ title: "Tutorial will show again next login", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not reset tutorial", description: (err as ApiError).message, variant: "error" }),
   });
 
   const uploadLogoMutation = useMutation({
@@ -117,6 +137,13 @@ export function CompanyProfile() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     createLoginMutation.mutate({ email: String(form.get("email")), password: String(form.get("password")) });
+  }
+
+  function handleSendNotification(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!notifyTarget) return;
+    const form = new FormData(e.currentTarget);
+    notifyMutation.mutate({ userId: notifyTarget.id, message: String(form.get("message")) });
   }
 
   function generatePassword() {
@@ -395,19 +422,49 @@ export function CompanyProfile() {
                     </div>
                     <div className="flex items-center gap-2">
                       {u.suspended ? <Badge variant="danger">Suspended</Badge> : <Badge variant="success">Active</Badge>}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => suspendMutation.mutate({ userId: u.id, suspend: !u.suspended })}
-                        title={u.suspended ? "Reinstate access" : "Suspend access"}
-                      >
-                        {u.suspended ? <ShieldCheck className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" title="More actions">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => setNotifyTarget({ id: u.id, email: u.email })}>
+                            <Bell className="h-4 w-4" /> Send notification
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => resetTutorialMutation.mutate(u.id)}>
+                            <GraduationCap className="h-4 w-4" /> Resend tutorial
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => suspendMutation.mutate({ userId: u.id, suspend: !u.suspended })}>
+                            {u.suspended ? <ShieldCheck className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
+                            {u.suspended ? "Reinstate access" : "Suspend access"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
+
+            <Dialog open={!!notifyTarget} onOpenChange={(open) => !open && setNotifyTarget(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Send a notification to {notifyTarget?.email}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSendNotification} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="notifyMessage">Message</Label>
+                    <Textarea id="notifyMessage" name="message" required maxLength={500} rows={4} />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" loading={notifyMutation.isPending}>
+                      Send
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             <Card>
               <CardHeader>

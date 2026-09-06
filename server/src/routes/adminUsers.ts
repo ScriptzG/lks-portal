@@ -121,7 +121,21 @@ adminUsersRouter.post("/:id/reinstate", async (req, res) => {
   res.json(user);
 });
 
-adminUsersRouter.post("/:id/notify-test", async (req, res) => {
-  await notifyUser({ userId: req.params.id, type: "general", message: "Test notification from LKS admin." });
+const notifySchema = z.object({ message: z.string().min(1).max(500) });
+
+adminUsersRouter.post("/:id/notify", async (req, res) => {
+  const parsed = notifySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  await notifyUser({ userId: req.params.id, type: "general", message: parsed.data.message });
   res.json({ ok: true });
+});
+
+adminUsersRouter.post("/:id/reset-tutorial", async (req, res) => {
+  const user = await prisma.user.update({
+    where: { id: req.params.id },
+    data: { tutorialSeenAt: null },
+    select: SAFE_USER_SELECT,
+  });
+  res.json(user);
 });

@@ -97,6 +97,8 @@ export const api = {
       post<any>("/admin/clients", { email, password, companyId }),
     suspend: (id: string) => post<any>(`/admin/clients/${id}/suspend`),
     reinstate: (id: string) => post<any>(`/admin/clients/${id}/reinstate`),
+    notify: (id: string, message: string) => post<any>(`/admin/clients/${id}/notify`, { message }),
+    resetTutorial: (id: string) => post<any>(`/admin/clients/${id}/reset-tutorial`),
   },
   websites: {
     list: (companyId?: string) => get<any[]>(`/websites${companyId ? `?companyId=${companyId}` : ""}`),
