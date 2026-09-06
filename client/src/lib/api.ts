@@ -93,6 +93,8 @@ export const api = {
     list: () => get<any[]>("/admin/clients"),
     invites: () => get<any[]>("/admin/clients/invites"),
     invite: (email: string, companyId: string) => post<any>("/admin/clients/invite", { email, companyId }),
+    create: (email: string, password: string, companyId: string) =>
+      post<any>("/admin/clients", { email, password, companyId }),
     suspend: (id: string) => post<any>(`/admin/clients/${id}/suspend`),
     reinstate: (id: string) => post<any>(`/admin/clients/${id}/reinstate`),
   },

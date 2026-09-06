@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
@@ -74,6 +75,32 @@ adminUsersRouter.post("/invite", async (req, res) => {
   });
 
   res.status(201).json(invite);
+});
+
+const createLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  companyId: z.string().uuid(),
+});
+
+adminUsersRouter.post("/", async (req, res) => {
+  const parsed = createLoginSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const email = parsed.data.email.toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return res.status(409).json({ error: "A user with that email already exists" });
+
+  const company = await prisma.company.findUnique({ where: { id: parsed.data.companyId } });
+  if (!company) return res.status(404).json({ error: "Company not found" });
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  const user = await prisma.user.create({
+    data: { email, passwordHash, role: "client", companyId: company.id },
+    select: SAFE_USER_SELECT,
+  });
+
+  res.status(201).json(user);
 });
 
 adminUsersRouter.post("/:id/suspend", async (req, res) => {

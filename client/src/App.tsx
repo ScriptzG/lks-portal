@@ -25,16 +25,15 @@ import { ClientDocuments } from "@/routes/portal/ClientDocuments";
 import { ClientTickets } from "@/routes/portal/ClientTickets";
 import { ClientExtras } from "@/routes/portal/ClientExtras";
 import { AccountSettings } from "@/routes/portal/AccountSettings";
-import { MarketingHome } from "@/routes/MarketingHome";
 import { LoadingState } from "@/components/ui/state";
 
-// A signed-in user landing on "/" (e.g. right after login, which navigates here) still goes
-// straight to their dashboard — only a logged-out visitor sees the public marketing site, whose
-// own "Client Login" link is the way into /login.
+// This app is deployed on its own portal subdomain, separate from the public marketing site —
+// so "/" has no visitor-facing content of its own. Signed-in users go to their dashboard;
+// everyone else goes to /login.
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingState />;
-  if (!user) return <MarketingHome />;
+  if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={user.role === "admin" ? "/admin" : "/portal"} replace />;
 }
 

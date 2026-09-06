@@ -13,7 +13,13 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
-  clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
+  clientOrigins: (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  get clientOrigin(): string {
+    return this.clientOrigins[0];
+  },
   mockServices: (process.env.MOCK_SERVICES ?? "true").toLowerCase() !== "false",
   netlifyApiToken: process.env.NETLIFY_API_TOKEN ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",

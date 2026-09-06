@@ -11,3 +11,6 @@ lks-systems-site/
 .DS_Store
 .vscode/
 coverage/
+
+# Local Netlify folder
+.netlify

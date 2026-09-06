@@ -27,6 +27,7 @@ export function CompanyProfile() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const { data: company, isLoading, isError } = useQuery({
     queryKey: ["companies", id],
@@ -46,14 +47,15 @@ export function CompanyProfile() {
     onError: (err) => toast({ title: "Could not add contact", description: (err as ApiError).message, variant: "error" }),
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: (email: string) => api.adminClients.invite(email, id),
+  const createLoginMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      api.adminClients.create(email, password, id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminInvites"] });
-      toast({ title: "Invite sent", description: "An email with a login link has been queued.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["adminClients"] });
+      toast({ title: "Login created", description: "The client can sign in with that email and password now.", variant: "success" });
       setInviteDialogOpen(false);
     },
-    onError: (err) => toast({ title: "Could not send invite", description: (err as ApiError).message, variant: "error" }),
+    onError: (err) => toast({ title: "Could not create login", description: (err as ApiError).message, variant: "error" }),
   });
 
   const suspendMutation = useMutation({
@@ -111,10 +113,15 @@ export function CompanyProfile() {
     });
   }
 
-  function handleInvite(e: FormEvent<HTMLFormElement>) {
+  function handleCreateLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    inviteMutation.mutate(String(form.get("email")));
+    createLoginMutation.mutate({ email: String(form.get("email")), password: String(form.get("password")) });
+  }
+
+  function generatePassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(9));
+    return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, "").slice(0, 12);
   }
 
   return (
@@ -334,20 +341,44 @@ export function CompanyProfile() {
                 <CardTitle>Client logins</CardTitle>
                 <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                   <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
-                    <Mail className="h-4 w-4" /> Invite
+                    <Mail className="h-4 w-4" /> Create login
                   </Button>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Invite a client user</DialogTitle>
+                      <DialogTitle>Create a client login</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={handleInvite} className="flex flex-col gap-4">
+                    <form onSubmit={handleCreateLogin} className="flex flex-col gap-4">
                       <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="inviteEmail">Email</Label>
-                        <Input id="inviteEmail" name="email" type="email" required />
+                        <Label htmlFor="loginEmail">Email</Label>
+                        <Input id="loginEmail" name="email" type="email" required />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="loginPassword">Password</Label>
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-violet-600 hover:text-violet-700"
+                            onClick={() => {
+                              if (passwordInputRef.current) passwordInputRef.current.value = generatePassword();
+                            }}
+                          >
+                            Generate
+                          </button>
+                        </div>
+                        <Input
+                          ref={passwordInputRef}
+                          id="loginPassword"
+                          name="password"
+                          type="text"
+                          minLength={8}
+                          required
+                          placeholder="At least 8 characters"
+                        />
+                        <p className="text-xs text-gray-400">Share this with the client yourself — no email is sent.</p>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" loading={inviteMutation.isPending}>
-                          Send invite
+                        <Button type="submit" loading={createLoginMutation.isPending}>
+                          Create login
                         </Button>
                       </DialogFooter>
                     </form>
