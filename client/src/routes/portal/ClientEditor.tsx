@@ -49,6 +49,7 @@ export function ClientEditor() {
   // force-reload the Visual editor's live iframe too, not just the List view's static preview.
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [hasUnsaved, setHasUnsaved] = useState(false);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   // Mirrors `values` so the unmount/exit handlers below — which can't rely on a state closure
@@ -82,6 +83,7 @@ export function ClientEditor() {
     },
     onSuccess: () => {
       hasUnsavedRef.current = false;
+      setHasUnsaved(false);
       setLastSavedAt(new Date());
       // The List view's preview panel is a static iframe (not live-edited DOM like the
       // Visual editor), so it needs an explicit reload to reflect the saved draft.
@@ -92,6 +94,7 @@ export function ClientEditor() {
 
   function scheduleAutosave(nextValues: Record<string, string>) {
     hasUnsavedRef.current = true;
+    setHasUnsaved(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => saveDraftMutation.mutate(nextValues), 800);
   }
@@ -234,6 +237,7 @@ export function ClientEditor() {
     mutationFn: (snapshotId: string) => api.fields.restoreSnapshot(websiteId, snapshotId),
     onSuccess: (result) => {
       hasUnsavedRef.current = false;
+      setHasUnsaved(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setValues(Object.fromEntries(result.fields.map((f: any) => [f.id, f.draftValue ?? f.currentValue ?? ""])));
       setPreviewNonce((n) => n + 1);
@@ -288,6 +292,8 @@ export function ClientEditor() {
           <p className="text-sm text-gray-500">
             {saveDraftMutation.isPending
               ? "Saving…"
+              : hasUnsaved
+              ? "Unsaved changes…"
               : lastSavedAt
               ? `Draft saved at ${lastSavedAt.toLocaleTimeString()}`
               : "Changes save automatically."}
