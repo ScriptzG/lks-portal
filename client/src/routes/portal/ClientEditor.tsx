@@ -56,6 +56,11 @@ export function ClientEditor() {
   // captured back when the effect was set up — always see the latest edits.
   const valuesRef = useRef<Record<string, string>>({});
   const hasUnsavedRef = useRef(false);
+  // Field ids touched since the last successful save. A site can have hundreds of editable
+  // fields (one client's site has 900+), so a save must only ever ship the handful that actually
+  // changed — sending every field's value on every keystroke was taking 10+ seconds and timing
+  // out, which is almost certainly what clients were experiencing as "my edits aren't saving".
+  const dirtyFieldIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (fields) {
@@ -77,13 +82,18 @@ export function ClientEditor() {
   }, [fields]);
 
   const saveDraftMutation = useMutation({
-    mutationFn: (currentValues: Record<string, string>) => {
-      const payload = Object.entries(currentValues).map(([id, draftValue]) => ({ id, draftValue }));
-      return api.fields.saveDraft(websiteId, payload);
+    mutationFn: (fieldIds: string[]) => {
+      const payload = fieldIds.map((id) => ({ id, draftValue: valuesRef.current[id] ?? "" }));
+      return api.fields.saveDraft(websiteId, payload).then(() => fieldIds);
     },
-    onSuccess: () => {
-      hasUnsavedRef.current = false;
-      setHasUnsaved(false);
+    onSuccess: (savedIds) => {
+      // Only clear the ids this particular request actually saved — a field edited again while
+      // an earlier save for a *different* field was still in flight must stay marked dirty.
+      savedIds.forEach((id) => dirtyFieldIdsRef.current.delete(id));
+      if (dirtyFieldIdsRef.current.size === 0) {
+        hasUnsavedRef.current = false;
+        setHasUnsaved(false);
+      }
       setLastSavedAt(new Date());
       // The List view's preview panel is a static iframe (not live-edited DOM like the
       // Visual editor), so it needs an explicit reload to reflect the saved draft.
@@ -92,22 +102,29 @@ export function ClientEditor() {
     onError: (err) => toast({ title: "Could not save draft", description: (err as ApiError).message, variant: "error" }),
   });
 
-  function scheduleAutosave(nextValues: Record<string, string>) {
+  function scheduleAutosave(fieldId: string) {
+    dirtyFieldIdsRef.current.add(fieldId);
     hasUnsavedRef.current = true;
     setHasUnsaved(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => saveDraftMutation.mutate(nextValues), 800);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = undefined;
+      const ids = [...dirtyFieldIdsRef.current];
+      if (ids.length > 0) saveDraftMutation.mutate(ids);
+    }, 800);
   }
 
-  // Flushes a still-pending autosave immediately rather than losing it — otherwise a client who
-  // edits a field and leaves within the 800ms debounce window (clicking "Back to dashboard", or
-  // just closing the tab) loses that last edit even though autosave "should" have caught it. This
-  // was very likely the actual cause behind "my changes didn't save" reports.
-  function flushPendingSave() {
-    if (!debounceRef.current) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = undefined;
-    if (hasUnsavedRef.current) saveDraftMutation.mutate(valuesRef.current);
+  // Flushes still-pending autosaved edits immediately rather than losing them — otherwise a
+  // client who edits a field and leaves within the 800ms debounce window (clicking "Back to
+  // dashboard", or just closing the tab) loses that last edit even though autosave "should" have
+  // caught it. This was very likely the actual cause behind "my changes didn't save" reports.
+  function flushPendingSave(): Promise<unknown> {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = undefined;
+    }
+    const ids = [...dirtyFieldIdsRef.current];
+    return ids.length > 0 ? saveDraftMutation.mutateAsync(ids) : Promise.resolve();
   }
 
   useEffect(() => {
@@ -116,11 +133,12 @@ export function ClientEditor() {
 
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!hasUnsavedRef.current) return;
+      const ids = [...dirtyFieldIdsRef.current];
+      if (ids.length === 0) return;
       // A normal fetch can be cut off mid-flight once the page starts unloading; `saveDraftOnExit`
       // uses `keepalive` so the request actually completes. Still warn the user in case it's slow
       // to land — better an extra confirmation click than a silently lost edit.
-      const payload = Object.entries(valuesRef.current).map(([id, draftValue]) => ({ id, draftValue }));
+      const payload = ids.map((id) => ({ id, draftValue: valuesRef.current[id] ?? "" }));
       api.fields.saveDraftOnExit(websiteId, payload);
       e.preventDefault();
       e.returnValue = "";
@@ -134,22 +152,16 @@ export function ClientEditor() {
   }, [websiteId]);
 
   function handleFieldChange(fieldId: string, value: string) {
-    setValues((prev) => {
-      const next = { ...prev, [fieldId]: value };
-      scheduleAutosave(next);
-      return next;
-    });
+    setValues((prev) => ({ ...prev, [fieldId]: value }));
+    scheduleAutosave(fieldId);
   }
 
   async function uploadImageForField(fieldId: string, fieldKey: string, file: File) {
     setUploadingFieldId(fieldId);
     try {
       const { path } = await api.websites.uploadAsset(websiteId, file);
-      setValues((prev) => {
-        const next = { ...prev, [fieldId]: path };
-        scheduleAutosave(next);
-        return next;
-      });
+      setValues((prev) => ({ ...prev, [fieldId]: path }));
+      scheduleAutosave(fieldId);
       iframeRef.current?.contentWindow?.postMessage(
         { source: "lks-visual-editor-host", type: "set-value", fieldKey, value: path },
         window.location.origin,
@@ -191,8 +203,7 @@ export function ClientEditor() {
 
   const requestPublishMutation = useMutation({
     mutationFn: async () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      await saveDraftMutation.mutateAsync(values);
+      await flushPendingSave();
       return api.fields.requestPublish(websiteId);
     },
     onSuccess: () => {
@@ -204,8 +215,7 @@ export function ClientEditor() {
 
   const publishNowMutation = useMutation({
     mutationFn: async () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      await saveDraftMutation.mutateAsync(values);
+      await flushPendingSave();
       return api.deployments.deploy(websiteId);
     },
     onSuccess: () => {
@@ -222,8 +232,7 @@ export function ClientEditor() {
 
   const saveSnapshotMutation = useMutation({
     mutationFn: async () => {
-      flushPendingSave();
-      await saveDraftMutation.mutateAsync(values);
+      await flushPendingSave();
       return api.fields.saveSnapshot(websiteId);
     },
     onSuccess: () => {
@@ -238,6 +247,7 @@ export function ClientEditor() {
     onSuccess: (result) => {
       hasUnsavedRef.current = false;
       setHasUnsaved(false);
+      dirtyFieldIdsRef.current.clear();
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setValues(Object.fromEntries(result.fields.map((f: any) => [f.id, f.draftValue ?? f.currentValue ?? ""])));
       setPreviewNonce((n) => n + 1);
@@ -301,7 +311,7 @@ export function ClientEditor() {
         </div>
         <div className="flex items-center gap-2">
           {website.status === "pending_review" && <Badge variant="warning">Pending review</Badge>}
-          <Button variant="outline" onClick={() => saveDraftMutation.mutate(values)} loading={saveDraftMutation.isPending} disabled={locked}>
+          <Button variant="outline" onClick={() => flushPendingSave()} loading={saveDraftMutation.isPending} disabled={locked}>
             <Save className="h-4 w-4" /> Save draft
           </Button>
           <DropdownMenu>

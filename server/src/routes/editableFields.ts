@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireWebsiteAccess } from "../middleware/websiteAccess.js";
@@ -39,17 +40,29 @@ editableFieldsRouter.post("/draft", requireWebsiteAccess, async (req, res) => {
   });
   const recordById = new Map(fieldRecords.map((f) => [f.id, f]));
 
-  await Promise.all(
-    parsed.data.fields.map((f) => {
-      const fieldType = recordById.get(f.id)?.fieldType;
-      const value =
-        fieldType === "text" || fieldType === "textarea" ? sanitizeRichText(f.draftValue) : f.draftValue;
-      return prisma.editableField.update({
-        where: { id: f.id, websiteId: req.params.id },
-        data: { draftValue: value },
-      });
-    }),
-  );
+  // A single bulk statement rather than one UPDATE per field — a save on a large site (some run
+  // into the hundreds of editable fields) was issuing hundreds of individual round-trips here,
+  // which could take upwards of ten seconds and time out. One `UPDATE ... FROM (VALUES ...)`
+  // does the same work in a single round-trip regardless of how many fields are included.
+  const rows = parsed.data.fields.map((f) => {
+    const fieldType = recordById.get(f.id)?.fieldType;
+    const value = fieldType === "text" || fieldType === "textarea" ? sanitizeRichText(f.draftValue) : f.draftValue;
+    return { id: f.id, value };
+  });
+  if (rows.length > 0) {
+    // Ids are plain-text UUIDs (String @id @default(uuid()), not a native `uuid` column) — no
+    // ::uuid cast here, or Postgres rejects the comparison with "operator does not exist: text = uuid".
+    const valuesSql = Prisma.join(
+      rows.map((r) => Prisma.sql`(${r.id}, ${r.value})`),
+      ",",
+    );
+    await prisma.$executeRaw`
+      UPDATE editable_fields AS t
+      SET "draftValue" = v.value, "updatedAt" = now()
+      FROM (VALUES ${valuesSql}) AS v(id, value)
+      WHERE t.id = v.id AND t."websiteId" = ${req.params.id}
+    `;
+  }
 
   // Bake the saved value(s) straight into the page's own stored HTML too, not just this table —
   // see persistFieldsToFiles for why that's safe to do unconditionally on every save.
@@ -125,11 +138,18 @@ editableFieldsRouter.post("/snapshots/:snapshotId/restore", requireWebsiteAccess
     select: { id: true, sourceFile: true },
   });
 
-  await Promise.all(
-    fieldRecords.map((f) =>
-      prisma.editableField.update({ where: { id: f.id }, data: { draftValue: values[f.id] } }),
-    ),
-  );
+  if (fieldRecords.length > 0) {
+    const valuesSql = Prisma.join(
+      fieldRecords.map((f) => Prisma.sql`(${f.id}, ${values[f.id]})`),
+      ",",
+    );
+    await prisma.$executeRaw`
+      UPDATE editable_fields AS t
+      SET "draftValue" = v.value, "updatedAt" = now()
+      FROM (VALUES ${valuesSql}) AS v(id, value)
+      WHERE t.id = v.id AND t."websiteId" = ${req.params.id}
+    `;
+  }
   const touchedFiles = fieldRecords.map((f) => f.sourceFile).filter((f): f is string => !!f);
   await persistFieldsToFiles(req.params.id, touchedFiles);
 
