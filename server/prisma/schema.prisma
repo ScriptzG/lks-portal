@@ -41,13 +41,14 @@ model User {
   lastLoginAt    DateTime?
   tutorialSeenAt DateTime?
 
-  triggeredDeployments Deployment[]   @relation("DeploymentTriggeredBy")
+  triggeredDeployments Deployment[]     @relation("DeploymentTriggeredBy")
   notifications        Notification[]
-  sentInvites          Invite[]       @relation("InvitedBy")
-  sentMessages         Message[]      @relation("MessageSender")
+  sentInvites          Invite[]         @relation("InvitedBy")
+  sentMessages         Message[]        @relation("MessageSender")
   uploadedDocuments    Document[]
-  createdTickets       Ticket[]       @relation("TicketCreator")
+  createdTickets       Ticket[]         @relation("TicketCreator")
   ticketReplies        TicketReply[]
+  editorSnapshots      EditorSnapshot[]
 
   @@map("users")
 }
@@ -132,6 +133,7 @@ model Website {
   files          WebsiteFile[]
   editableFields EditableField[]
   deployments    Deployment[]
+  editorSnapshots EditorSnapshot[]
 
   @@map("websites")
 }
@@ -168,6 +170,24 @@ model EditableField {
 
   @@unique([websiteId, fieldKey])
   @@map("editable_fields")
+}
+
+// A manually-saved, named snapshot of every editable field's value at a point in time, so a
+// client can save a version, keep editing, and get back to it if they don't like where things
+// end up — distinct from `EditableField.draftValue`, which is just the continuously-autosaved
+// in-progress state and holds no history at all. Capped at 2 per (website, user) pair — see
+// rotateSnapshots in editableFields.ts, which deletes the oldest once a 3rd would be created.
+model EditorSnapshot {
+  id        String   @id @default(uuid())
+  websiteId String
+  website   Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  values    Json
+  createdAt DateTime @default(now())
+
+  @@map("editor_snapshots")
 }
 
 model Deployment {

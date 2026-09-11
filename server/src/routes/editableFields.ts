@@ -59,6 +59,84 @@ editableFieldsRouter.post("/draft", requireWebsiteAccess, async (req, res) => {
   res.json({ ok: true });
 });
 
+const MAX_SNAPSHOTS_PER_USER = 2;
+
+editableFieldsRouter.get("/snapshots", requireWebsiteAccess, async (req, res) => {
+  const snapshots = await prisma.editorSnapshot.findMany({
+    where: { websiteId: req.params.id, userId: req.user!.id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, label: true, createdAt: true },
+  });
+  res.json(snapshots);
+});
+
+const saveSnapshotSchema = z.object({ label: z.string().min(1).max(60).optional() });
+
+editableFieldsRouter.post("/snapshots", requireWebsiteAccess, async (req, res) => {
+  if (req.website!.editLocked && req.user!.role === "client") {
+    return res.status(403).json({ error: "Editing is currently locked by LKS Systems." });
+  }
+  const parsed = saveSnapshotSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const fields = await prisma.editableField.findMany({
+    where: { websiteId: req.params.id },
+    select: { id: true, draftValue: true, currentValue: true },
+  });
+  const values = Object.fromEntries(fields.map((f) => [f.id, f.draftValue ?? f.currentValue ?? ""]));
+
+  // Cap at MAX_SNAPSHOTS_PER_USER: once a new one would exceed it, the oldest gets pushed out —
+  // "save a version" always keeps only the most recent couple, never grows without bound.
+  const existing = await prisma.editorSnapshot.findMany({
+    where: { websiteId: req.params.id, userId: req.user!.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (existing.length >= MAX_SNAPSHOTS_PER_USER) {
+    const toRemove = existing.slice(0, existing.length - MAX_SNAPSHOTS_PER_USER + 1);
+    await prisma.editorSnapshot.deleteMany({ where: { id: { in: toRemove.map((s) => s.id) } } });
+  }
+
+  const snapshot = await prisma.editorSnapshot.create({
+    data: {
+      websiteId: req.params.id,
+      userId: req.user!.id,
+      label: parsed.data.label ?? new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+      values,
+    },
+    select: { id: true, label: true, createdAt: true },
+  });
+  res.status(201).json(snapshot);
+});
+
+editableFieldsRouter.post("/snapshots/:snapshotId/restore", requireWebsiteAccess, async (req, res) => {
+  if (req.website!.editLocked && req.user!.role === "client") {
+    return res.status(403).json({ error: "Editing is currently locked by LKS Systems." });
+  }
+
+  const snapshot = await prisma.editorSnapshot.findUnique({ where: { id: req.params.snapshotId } });
+  if (!snapshot || snapshot.websiteId !== req.params.id || snapshot.userId !== req.user!.id) {
+    return res.status(404).json({ error: "Version not found" });
+  }
+
+  const values = snapshot.values as Record<string, string>;
+  const fieldRecords = await prisma.editableField.findMany({
+    where: { id: { in: Object.keys(values) }, websiteId: req.params.id },
+    select: { id: true, sourceFile: true },
+  });
+
+  await Promise.all(
+    fieldRecords.map((f) =>
+      prisma.editableField.update({ where: { id: f.id }, data: { draftValue: values[f.id] } }),
+    ),
+  );
+  const touchedFiles = fieldRecords.map((f) => f.sourceFile).filter((f): f is string => !!f);
+  await persistFieldsToFiles(req.params.id, touchedFiles);
+
+  const restored = await prisma.editableField.findMany({ where: { websiteId: req.params.id } });
+  res.json({ fields: restored });
+});
+
 editableFieldsRouter.post("/request-publish", requireWebsiteAccess, async (req, res) => {
   if (req.website!.editLocked && req.user!.role === "client") {
     return res.status(403).json({ error: "Editing is currently locked by LKS Systems." });

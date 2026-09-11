@@ -3,7 +3,7 @@
 // directly against Render) — and since login also happens over this same origin, the auth cookie
 // is scoped to it consistently rather than only ever existing for the proxied origin. Local dev
 // keeps the relative path so Vite's own dev-server proxy (see vite.config.ts) still applies.
-const BASE = import.meta.env.DEV ? "/api" : "https://lks-portal.onrender.com/api";
+export const BASE = import.meta.env.DEV ? "/api" : "https://lks-portal.onrender.com/api";
 
 export class ApiError extends Error {
   status: number;
@@ -141,7 +141,25 @@ export const api = {
     list: (websiteId: string) => get<any[]>(`/websites/${websiteId}/fields`),
     saveDraft: (websiteId: string, fields: { id: string; draftValue: string }[]) =>
       post(`/websites/${websiteId}/fields/draft`, { fields }),
+    // Fires a save that keeps running even after the tab starts closing/navigating away —
+    // `fetch`'s `keepalive` flag is exactly for this ("beforeunload"/"pagehide" handlers), unlike
+    // a normal fetch which the browser is free to abort mid-flight once the page unloads.
+    saveDraftOnExit: (websiteId: string, fields: { id: string; draftValue: string }[]) => {
+      fetch(`${BASE}/websites/${websiteId}/fields/draft`, {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+    },
     requestPublish: (websiteId: string) => post(`/websites/${websiteId}/fields/request-publish`),
+    snapshots: (websiteId: string) =>
+      get<{ id: string; label: string; createdAt: string }[]>(`/websites/${websiteId}/fields/snapshots`),
+    saveSnapshot: (websiteId: string, label?: string) =>
+      post<{ id: string; label: string; createdAt: string }>(`/websites/${websiteId}/fields/snapshots`, { label }),
+    restoreSnapshot: (websiteId: string, snapshotId: string) =>
+      post<{ fields: any[] }>(`/websites/${websiteId}/fields/snapshots/${snapshotId}/restore`),
   },
   deployments: {
     list: (websiteId: string) => get<any[]>(`/deployments/website/${websiteId}`),

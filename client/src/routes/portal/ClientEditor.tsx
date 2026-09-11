@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, MousePointerClick, Rocket, Save, Send, ListChecks } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Rocket, Save, Send, ListChecks, History, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingState, ErrorState } from "@/components/ui/state";
 import { useToast } from "@/components/ui/toaster";
 import { EditableFieldForm, type EditableFieldData } from "@/components/editor/EditableFieldForm";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { formatDate } from "@/lib/utils";
 
 interface EditorMessage {
   source: "lks-visual-editor";
@@ -43,9 +45,16 @@ export function ClientEditor() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
   const [previewNonce, setPreviewNonce] = useState(0);
+  // Separate from previewNonce (which only ever bumps in list view) because a restore needs to
+  // force-reload the Visual editor's live iframe too, not just the List view's static preview.
+  const [restoreNonce, setRestoreNonce] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  // Mirrors `values` so the unmount/exit handlers below — which can't rely on a state closure
+  // captured back when the effect was set up — always see the latest edits.
+  const valuesRef = useRef<Record<string, string>>({});
+  const hasUnsavedRef = useRef(false);
 
   useEffect(() => {
     if (fields) {
@@ -72,6 +81,7 @@ export function ClientEditor() {
       return api.fields.saveDraft(websiteId, payload);
     },
     onSuccess: () => {
+      hasUnsavedRef.current = false;
       setLastSavedAt(new Date());
       // The List view's preview panel is a static iframe (not live-edited DOM like the
       // Visual editor), so it needs an explicit reload to reflect the saved draft.
@@ -81,9 +91,44 @@ export function ClientEditor() {
   });
 
   function scheduleAutosave(nextValues: Record<string, string>) {
+    hasUnsavedRef.current = true;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => saveDraftMutation.mutate(nextValues), 800);
   }
+
+  // Flushes a still-pending autosave immediately rather than losing it — otherwise a client who
+  // edits a field and leaves within the 800ms debounce window (clicking "Back to dashboard", or
+  // just closing the tab) loses that last edit even though autosave "should" have caught it. This
+  // was very likely the actual cause behind "my changes didn't save" reports.
+  function flushPendingSave() {
+    if (!debounceRef.current) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = undefined;
+    if (hasUnsavedRef.current) saveDraftMutation.mutate(valuesRef.current);
+  }
+
+  useEffect(() => {
+    valuesRef.current = values;
+  }, [values]);
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!hasUnsavedRef.current) return;
+      // A normal fetch can be cut off mid-flight once the page starts unloading; `saveDraftOnExit`
+      // uses `keepalive` so the request actually completes. Still warn the user in case it's slow
+      // to land — better an extra confirmation click than a silently lost edit.
+      const payload = Object.entries(valuesRef.current).map(([id, draftValue]) => ({ id, draftValue }));
+      api.fields.saveDraftOnExit(websiteId, payload);
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      flushPendingSave();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [websiteId]);
 
   function handleFieldChange(fieldId: string, value: string) {
     setValues((prev) => {
@@ -167,6 +212,37 @@ export function ClientEditor() {
     onError: (err) => toast({ title: "Could not publish", description: (err as ApiError).message, variant: "error" }),
   });
 
+  const { data: snapshots } = useQuery({
+    queryKey: ["websites", websiteId, "snapshots"],
+    queryFn: () => api.fields.snapshots(websiteId),
+  });
+
+  const saveSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      flushPendingSave();
+      await saveDraftMutation.mutateAsync(values);
+      return api.fields.saveSnapshot(websiteId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["websites", websiteId, "snapshots"] });
+      toast({ title: "Version saved", description: "You can restore it later from Version history.", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not save version", description: (err as ApiError).message, variant: "error" }),
+  });
+
+  const restoreSnapshotMutation = useMutation({
+    mutationFn: (snapshotId: string) => api.fields.restoreSnapshot(websiteId, snapshotId),
+    onSuccess: (result) => {
+      hasUnsavedRef.current = false;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setValues(Object.fromEntries(result.fields.map((f: any) => [f.id, f.draftValue ?? f.currentValue ?? ""])));
+      setPreviewNonce((n) => n + 1);
+      setRestoreNonce((n) => n + 1);
+      toast({ title: "Version restored", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Could not restore version", description: (err as ApiError).message, variant: "error" }),
+  });
+
   const formFields: EditableFieldData[] = useMemo(
     () => (fields ?? []).map((f: any) => ({ id: f.id, fieldKey: f.fieldKey, fieldType: f.fieldType, label: f.label, section: f.section })),
     [fields],
@@ -182,12 +258,12 @@ export function ClientEditor() {
   const visualPreviewSrc = useMemo(
     () => (page ? api.websites.previewUrl(websiteId, { mode: "draft", file: page, edit: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [websiteId, page],
+    [websiteId, page, restoreNonce],
   );
   const readOnlyPreviewSrc = useMemo(
     () => (page ? api.websites.previewUrl(websiteId, { mode: "draft", file: page }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [websiteId, page],
+    [websiteId, page, restoreNonce],
   );
   const listPreviewSrc = useMemo(
     () => api.websites.previewUrl(websiteId, { mode: "draft", file: page ?? undefined }),
@@ -222,6 +298,46 @@ export function ClientEditor() {
           <Button variant="outline" onClick={() => saveDraftMutation.mutate(values)} loading={saveDraftMutation.isPending} disabled={locked}>
             <Save className="h-4 w-4" /> Save draft
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={locked}>
+                <History className="h-4 w-4" /> Version history
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                onClick={() => saveSnapshotMutation.mutate()}
+                disabled={saveSnapshotMutation.isPending}
+              >
+                <Save className="h-4 w-4" /> Save current as a version
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>
+                Saved versions {snapshots ? `(${snapshots.length}/2)` : ""}
+              </DropdownMenuLabel>
+              {snapshots && snapshots.length === 0 && (
+                <p className="px-2.5 py-1.5 text-xs text-gray-400">
+                  None yet — saving a new one keeps only the most recent 2.
+                </p>
+              )}
+              {snapshots?.map((s) => (
+                <DropdownMenuItem
+                  key={s.id}
+                  onClick={() => {
+                    if (window.confirm(`Restore "${s.label}"? This replaces your current unsaved draft.`)) {
+                      restoreSnapshotMutation.mutate(s.id);
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span className="flex flex-col">
+                    <span>{s.label}</span>
+                    <span className="text-xs text-gray-400">{formatDate(s.createdAt)}</span>
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {website.allowSelfPublish ? (
             <Button onClick={() => publishNowMutation.mutate()} loading={publishNowMutation.isPending} disabled={locked}>
               <Rocket className="h-4 w-4" /> Publish now
